@@ -1,0 +1,24 @@
+{
+  "name": "link-moneyforward2binance",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node ./src/main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nmskm240/Link-Moneyforward2Binance.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nmskm240/Link-Moneyforward2Binance/issues"
+  },
+  "homepage": "https://github.com/nmskm240/Link-Moneyforward2Binance#readme",
+  "dependencies": {
+    "@binance/connector": "^1.13.0"
+  }
+}
