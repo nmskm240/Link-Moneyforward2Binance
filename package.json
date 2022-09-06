@@ -19,6 +19,8 @@
   },
   "homepage": "https://github.com/nmskm240/Link-Moneyforward2Binance#readme",
   "dependencies": {
-    "@binance/connector": "^1.13.0"
+    "@binance/connector": "^1.13.0",
+    "axios": "^0.27.2",
+    "dotenv": "^16.0.2"
   }
 }
