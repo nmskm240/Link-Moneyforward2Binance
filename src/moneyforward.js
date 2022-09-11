@@ -1,8 +1,10 @@
 import Puppeteer from 'puppeteer';
 
 const browser = await Puppeteer.launch({
-    headless: false,
-    slowMo: 100,
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox'
+    ]
 });
 const page = await browser.newPage();
 
@@ -71,12 +73,12 @@ async function updateBalance(name, balance) {
         const text = await (await row.at(0).getProperty("textContent")).jsonValue();
         if (text == name) {
             const index = dataTable.indexOf(row);
-            await page.evaluate(({index, balance}) => {
+            await page.evaluate(({ index, balance }) => {
                 const form = document.forms[3 + index];
                 const input = form.querySelector("#user_asset_det_value")
                 input.value = balance.toFixed();
                 form.submit();
-            }, {index, balance});
+            }, { index, balance });
             await page.waitForNavigation({ waitUntil: "load" });
             break;
         }

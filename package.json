@@ -22,6 +22,7 @@
     "@binance/connector": "^1.13.0",
     "axios": "^0.27.2",
     "dotenv": "^16.0.2",
-    "puppeteer": "^17.1.0"
+    "puppeteer": "^17.1.0",
+    "@google-cloud/functions-framework": "^2.1.0"
   }
 }
