@@ -4,7 +4,7 @@ const browser = await Puppeteer.launch({
     args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-    ], headless: false
+    ]
 });
 const page = (await browser.pages())[0];
 
