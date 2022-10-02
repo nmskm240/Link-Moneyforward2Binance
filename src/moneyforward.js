@@ -6,13 +6,11 @@ const browser = await Puppeteer.launch({
         '--disable-setuid-sandbox',
     ], headless: false
 });
-const page = await browser.newPage();
+const page = (await browser.pages())[0];
 
 export async function login() {
-    await loadLoginPage();
-    await selectLoginMethod("email");
-    await autoCompliteForm("email", process.env.MONEYFORWARD_EMAIL);
-    await autoCompliteForm("password", process.env.MONEYFORWARD_PASSWORD);
+    const login = await Login.load();
+    await login.emailLogin();
 }
 
 export async function logout() {
@@ -24,31 +22,6 @@ export async function accountUpdate(accountName, portfolio) {
     await account.update(portfolio);
 }
 
-async function autoCompliteForm(type, text) {
-    await page.type(`input[type="${type}"]`, text);
-    page.click('input[type="submit"]');
-    await page.waitForNavigation({ waitUntil: "load" });
-}
-
-async function loadLoginPage() {
-    page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36");
-    await page.goto("https://moneyforward.com/login", { waitUntil: 'domcontentloaded' });
-
-    page.click('a[class="link-btn-reg"]');
-    await page.waitForNavigation({ waitUntil: "load" });
-}
-
-async function selectLoginMethod(methodName) {
-    const logingMethods = await page.$$('a[class="Sbsi4vRj ssoLink"]');
-    for (const method of logingMethods) {
-        if (await method.$(`img[alt="${methodName}"]`)) {
-            method.click();
-            await page.waitForNavigation({ waitUntil: "load" });
-            break;
-        }
-    }
-}
-
 class Page {
     constructor() {
         if (this.constructor == Page) {
@@ -58,6 +31,34 @@ class Page {
 
     static async load() {
         throw new Error("Method 'load()' must be implemented.");
+    }
+}
+
+class Login extends Page {
+    static async load() {
+        page.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36");
+        await page.goto("https://moneyforward.com/login", { waitUntil: 'domcontentloaded' });
+
+        page.click('a[class="link-btn-reg"]');
+        await page.waitForNavigation({ waitUntil: "load" });
+        return new Login();
+    }
+
+    async emailLogin() {
+        const logingMethods = await page.$$('a[class="Sbsi4vRj ssoLink"]');
+        for (const method of logingMethods) {
+            if (await method.$(`img[alt="email"]`)) {
+                method.click();
+                await page.waitForNavigation({ waitUntil: "load" });
+                break;
+            }
+        }
+        await page.type(`input[type="email"]`, process.env.MONEYFORWARD_EMAIL);
+        page.click('input[type="submit"]');
+        await page.waitForNavigation({ waitUntil: "load" });
+        await page.type(`input[type="password"]`, process.env.MONEYFORWARD_PASSWORD);
+        page.click('input[type="submit"]');
+        await page.waitForNavigation({ waitUntil: "load" });
     }
 }
 
@@ -73,9 +74,7 @@ class Account extends Page {
         const dataTable = await Promise.all(rows.map(async (row) => await row.$$("td")));
         const assets = await Promise.all(dataTable.map(async (row) => {
             const name = await (await row.at(0).getProperty("textContent")).jsonValue();
-            const index = dataTable.indexOf(row) + 3;
-            const button = row.at(3);
-            return new AccountAsset(name, index, button);
+            return new AccountAsset(name);
         }));
         return new Account(assets);
     }
@@ -95,18 +94,24 @@ class Account extends Page {
     }
 
     async update(portfolio) {
-        const deleteTargets = this.assets.filter((asset) => {
-            return portfolio.assets.some((value) => {
-                return asset.name != value.name;
+        const deleteTarget = this.assets.filter((target) => {
+            return !portfolio.assets.some((asset) => {
+                return asset.name == target.name;
             });
         });
-        for (const target of deleteTargets) {
-            await target.delete();
+        console.log(this.assets);
+        console.log(deleteTarget);
+        while (0 < deleteTarget.length) {
+            const target = deleteTarget.pop();
+            const index = this.assets.findIndex((asset) => target.name == asset.name);
+            this.assets.splice(index, 1)
+            await target.delete(index);
         }
         for (const asset of portfolio.assets) {
             const target = this.assets.find((value) => value.name == asset.name);
             if (target) {
-                await target.update(asset);
+                const index = this.assets.findIndex((asset) => target.name == asset.name);
+                await target.update(index, asset);
             } else {
                 await AccountAsset.create(asset);
             }
@@ -115,10 +120,8 @@ class Account extends Page {
 }
 
 class AccountAsset {
-    constructor(name, updateFormIndex, deleteButton) {
+    constructor(name) {
         this.name = name;
-        this._updateFormIndex = updateFormIndex;
-        this._deleteButton = deleteButton;
     }
 
     static async create(asset) {
@@ -132,23 +135,29 @@ class AccountAsset {
         await page.waitForNavigation({ waitUntil: "load" });
     }
 
-    async delete() {
+    async delete(index) {
+        index = index + 1;
+        const buttons = await page.$$('a[rel="nofollow"]');
+        const button = buttons[index];
         await Promise.all([
             page.once('dialog', async (dialog) => {
                 await dialog.accept();
+                await page.waitForNavigation({ waitUntil: "load" });
             }),
-            await this._deleteButton.click()
+            await button.click()
         ]);
-        await page.waitForNavigation({ waitUntil: "load" });
     }
 
-    async update(asset) {
-        await page.evaluate(({ asset }) => {
-            const form = document.forms[this._updateFormIndex];
-            form.querySelector("#user_asset_det_name").value = asset.name;
-            form.querySelector("user_asset_det_value").value = asset.amount.toFixed();
-            form.submit();
-        }, { asset });
-        await page.waitForNavigation({ waitUntil: "load" });
+    async update(index, asset) {
+        index = index + 3;
+        await Promise.all([
+            await page.evaluate(({ asset, index }) => {
+                const form = document.forms[index];
+                form.querySelector("#user_asset_det_name").value = asset.name;
+                form.querySelector("#user_asset_det_value").value = asset.amount.toFixed();
+                form.submit();
+            }, { asset, index }),
+            await page.waitForNavigation({ waitUntil: "load" })
+        ]);
     }
 }
